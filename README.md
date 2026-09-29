@@ -1,6 +1,9 @@
 # dns_powershell_checker
 A simple bulk DNS checker run via windows powershell. Checks for A records, PTR, Nameservers and RDAP data (registrar and contacts)
 
+# domains.txt
+Reference file. Paste your email addresses and domain names here for processing. Add the file under the project's root directory.
+
 # DNS & WHOIS Bulk Lookup (PowerShell)
 
 Bulk-resolves **A**, **PTR** and **NS** records for a list of domains (or email
