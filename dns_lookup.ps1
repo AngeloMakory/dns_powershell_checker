@@ -16,12 +16,16 @@ Queries the registry's own RDAP server first (found via IANA's bootstrap list),
 falling back to rdap.org if that fails. A whois_note column explains any n/a
 (no RDAP server for that TLD, registry returned nothing, no abuse contact published, etc).
 Use -NoWhois to skip WHOIS and run DNS-only.
+Also saves a row/column-aligned plain-text table (dns_results.txt by default,
+override with -TextOutputFile) for viewing outside Excel — e.g. in Notepad
+or pasted into a ticket/email.
 #>
 param(
     [Parameter(Mandatory)][string]$InputFile,
     [string]$OutputFile = "dns_results.csv",
     [string]$Server,           # optional resolver, e.g. 1.1.1.1
-    [switch]$NoWhois           # skip registrar/abuse lookup (faster)
+    [switch]$NoWhois,          # skip registrar/abuse lookup (faster)
+    [string]$TextOutputFile = "dns_results.txt"   # aligned plain-text table, readable outside Excel
 )
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -149,5 +153,9 @@ $results = foreach ($d in $domains) {
 }
 
 $results | Export-Csv $OutputFile -NoTypeInformation
+
+$results | Format-Table -AutoSize | Out-String -Width 4096 | Set-Content $TextOutputFile
+
 $results | Format-Table -AutoSize
 Write-Host "Saved $($results.Count) rows to $OutputFile"
+Write-Host "Saved aligned text table to $TextOutputFile"
