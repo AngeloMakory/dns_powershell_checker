@@ -10,8 +10,12 @@ Input file = one entry per line. Each line can be a domain OR an email address
 (user@example.com or "Name <user@example.com>"); the domain is extracted automatically.
 Duplicates are removed. Blank lines and # comments are ignored.
 
-Also returns registrar + abuse contact (email/phone) via RDAP, the modern WHOIS.
-Use -NoWhois to skip that and run DNS-only.
+Also returns registrar + abuse contact (email/phone) and ICANN domain status
+(e.g. clientTransferProhibited, ok, pendingDelete) via RDAP, the modern WHOIS.
+Queries the registry's own RDAP server first (found via IANA's bootstrap list),
+falling back to rdap.org if that fails. A whois_note column explains any n/a
+(no RDAP server for that TLD, registry returned nothing, no abuse contact published, etc).
+Use -NoWhois to skip WHOIS and run DNS-only.
 #>
 param(
     [Parameter(Mandatory)][string]$InputFile,
@@ -46,16 +50,49 @@ function Find-Entity($entities, $role) {
     }
 }
 
+$script:RdapBootstrap = $null
+function Get-RdapBase($tld) {
+    if (-not $script:RdapBootstrap) {
+        try {
+            $script:RdapBootstrap = Invoke-RestMethod "https://data.iana.org/rdap/dns.json" -TimeoutSec 15
+        } catch { $script:RdapBootstrap = $false }
+    }
+    if (-not $script:RdapBootstrap) { return $null }
+    foreach ($svc in $script:RdapBootstrap.services) {
+        if ($svc[0] -contains $tld) { return ($svc[1][0]).TrimEnd('/') }
+    }
+}
+
 function Get-Whois($domain) {
-    $out = [pscustomobject]@{ registrar = 'n/a'; abuse_email = 'n/a'; abuse_phone = 'n/a' }
-    try {
-        $r = Invoke-RestMethod "https://rdap.org/domain/$domain" -TimeoutSec 15 -ErrorAction Stop
-    } catch { return $out }
+    $out = [pscustomobject]@{ registrar = 'n/a'; abuse_email = 'n/a'; abuse_phone = 'n/a'; domain_status = 'n/a'; whois_note = '' }
+    $tld = ($domain -split '\.')[-1]
+
+    $urls = @()
+    $base = Get-RdapBase $tld
+    if ($base) { $urls += "$base/domain/$domain" }
+    $urls += "https://rdap.org/domain/$domain"   # fallback / catch-all
+
+    $r = $null
+    $lastErr = $null
+    foreach ($u in $urls) {
+        try { $r = Invoke-RestMethod $u -TimeoutSec 15 -ErrorAction Stop; break }
+        catch {
+            $lastErr = $_.Exception.Response.StatusCode
+            if (-not $lastErr) { $lastErr = 'timeout/unreachable' }
+        }
+    }
+
+    if (-not $r) {
+        $out.whois_note = if (-not $base) { "no RDAP server for .$tld" } else { "lookup failed ($lastErr)" }
+        return $out
+    }
 
     $reg = Find-Entity $r.entities 'registrar'
     $abuse = $null
     if ($reg) { $abuse = Find-Entity $reg.entities 'abuse' }
     if (-not $abuse) { $abuse = Find-Entity $r.entities 'abuse' }
+
+    if ($r.status) { $out.domain_status = (@($r.status) -join ';') }
 
     $name  = Get-VcardValue $reg 'fn'
     $email = Get-VcardValue $abuse 'email'
@@ -63,6 +100,10 @@ function Get-Whois($domain) {
     if ($name)  { $out.registrar   = $name }
     if ($email) { $out.abuse_email = $email }
     if ($phone) { $out.abuse_phone = $phone -replace '^tel:', '' }
+
+    if (-not $reg -and -not $abuse) { $out.whois_note = "registry returned no entities (privacy/thin registry)" }
+    elseif (-not $abuse)            { $out.whois_note = "no abuse contact published" }
+
     $out
 }
 
@@ -87,21 +128,23 @@ $results = foreach ($d in $domains) {
     }
 
     $w = if ($NoWhois) {
-        [pscustomobject]@{ registrar = ''; abuse_email = ''; abuse_phone = '' }
+        [pscustomobject]@{ registrar = ''; abuse_email = ''; abuse_phone = ''; domain_status = ''; whois_note = '' }
     } else {
         Start-Sleep -Milliseconds 300   # be gentle with RDAP servers
         Get-Whois $d
     }
 
     [pscustomobject]@{
-        domain      = $d
-        status      = if ($a) { 'OK' } else { 'NO_A' }
-        a_records   = $a   -join ';'
-        ptr_records = $ptr -join ';'
-        ns_records  = $ns  -join ';'
-        registrar   = $w.registrar
-        abuse_email = $w.abuse_email
-        abuse_phone = $w.abuse_phone
+        domain        = $d
+        status        = if ($a) { 'OK' } else { 'NO_A' }
+        a_records     = $a   -join ';'
+        ptr_records   = $ptr -join ';'
+        ns_records    = $ns  -join ';'
+        registrar     = $w.registrar
+        abuse_email   = $w.abuse_email
+        abuse_phone   = $w.abuse_phone
+        domain_status = $w.domain_status
+        whois_note    = $w.whois_note
     }
 }
 
