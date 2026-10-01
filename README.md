@@ -1,9 +1,3 @@
-# dns_powershell_checker
-A simple bulk DNS checker run via windows powershell. Checks for A records, PTR, Nameservers and RDAP data (registrar and contacts)
-
-# domains.txt
-Reference file. Paste your email addresses and domain names here for processing. Add the file under the project's root directory.
-
 # DNS & WHOIS Bulk Lookup (PowerShell)
 
 Bulk-resolves **A**, **PTR** and **NS** records for a list of domains (or email
@@ -74,6 +68,7 @@ Bob Smith <bob@example.net>
 | `-OutputFile` | No       | Output CSV path. Defaults to `dns_results.csv`.                     |
 | `-Server`     | No       | Use a specific DNS resolver (e.g. `8.8.8.8`) instead of the host's default. |
 | `-NoWhois`    | No       | Skip the RDAP/WHOIS lookup and only return DNS data (faster).       |
+| `-TextOutputFile` | No   | Aligned plain-text table path. Defaults to `dns_results.txt`.       |
 
 ### Examples
 
@@ -90,8 +85,15 @@ Bob Smith <bob@example.net>
 
 ## Output
 
-Results print to the terminal as a table and are saved to CSV with these
-columns:
+Results print to the terminal as a table and are saved to two files:
+
+- **`dns_results.csv`** — comma-separated, for Excel or further processing.
+- **`dns_results.txt`** — the same data as a row/column-aligned plain-text
+  table (like the terminal output), readable in Notepad or pasted directly
+  into a ticket/email without opening Excel. Override the path with
+  `-TextOutputFile`.
+
+Columns:
 
 | Column        | Description                                                          |
 |---------------|-----------------------------------------------------------------------|
@@ -103,6 +105,7 @@ columns:
 | `registrar`   | Registrar name from RDAP                                             |
 | `abuse_email` | Registrar/registry abuse contact email                               |
 | `abuse_phone` | Registrar/registry abuse contact phone                               |
+| `domain_status` | ICANN/EPP domain status code(s) (e.g. `clientTransferProhibited`, `ok`, `pendingDelete`), `;`-separated |
 | `whois_note`  | Explains an `n/a` result (see below) — blank when data was found     |
 
 ## How WHOIS/RDAP works here
