@@ -4,11 +4,15 @@ No install needed - uses the built-in Resolve-DnsName (Windows PowerShell 5.1 or
 
 Usage:
   .\dns_lookup.ps1 -InputFile domains.txt
+  .\dns_lookup.ps1 -Domain example.com
+  .\dns_lookup.ps1 -Domain example.com,user@other.com
+  .\dns_lookup.ps1 -Domain example.com -InputFile domains.txt   (combines both)
   .\dns_lookup.ps1 -InputFile domains.txt -OutputFile out.csv -Server 8.8.8.8
 
-Input file = one entry per line. Each line can be a domain OR an email address
-(user@example.com or "Name <user@example.com>"); the domain is extracted automatically.
-Duplicates are removed. Blank lines and # comments are ignored.
+Provide -InputFile, -Domain, or both. Each entry (from the file or typed on the
+command line) can be a domain OR an email address (user@example.com or
+"Name <user@example.com>"); the domain is extracted automatically.
+Duplicates are removed. Blank lines and # comments in the file are ignored.
 
 Also returns registrar + abuse contact (email/phone) and ICANN domain status
 (e.g. clientTransferProhibited, ok, pendingDelete) via RDAP, the modern WHOIS.
@@ -21,12 +25,21 @@ override with -TextOutputFile) for viewing outside Excel — e.g. in Notepad
 or pasted into a ticket/email.
 #>
 param(
-    [Parameter(Mandatory)][string]$InputFile,
+    [string]$InputFile,
+    [string[]]$Domain,         # one or more domains/emails typed directly, e.g. -Domain example.com,user@other.com
     [string]$OutputFile = "dns_results.csv",
     [string]$Server,           # optional resolver, e.g. 1.1.1.1
     [switch]$NoWhois,          # skip registrar/abuse lookup (faster)
     [string]$TextOutputFile = "dns_results.txt"   # aligned plain-text table, readable outside Excel
 )
+
+if (-not $InputFile -and -not $Domain) {
+    Write-Host "Provide at least one of -InputFile or -Domain. Examples:"
+    Write-Host "  .\dns_lookup.ps1 -InputFile domains.txt"
+    Write-Host "  .\dns_lookup.ps1 -Domain example.com"
+    Write-Host "  .\dns_lookup.ps1 -Domain example.com,user@other.com -InputFile domains.txt"
+    exit 1
+}
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
@@ -111,7 +124,11 @@ function Get-Whois($domain) {
     $out
 }
 
-$domains = Get-Content $InputFile |
+$rawEntries = @()
+if ($InputFile) { $rawEntries += Get-Content $InputFile }
+if ($Domain)    { $rawEntries += $Domain }
+
+$domains = $rawEntries |
     ForEach-Object { $_.Trim().ToLower() } |
     Where-Object { $_ -and -not $_.StartsWith('#') } |
     ForEach-Object {
