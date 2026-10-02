@@ -34,10 +34,24 @@ One entry per line in `domains.txt`. Each line can be:
 The script extracts the domain automatically and de-duplicates the list.
 Blank lines and lines starting with `#` are ignored.
 
+**Defanged/obfuscated domains are also accepted** (common in abuse reports and
+threat-intel feeds, used so links don't render as clickable). These are
+automatically cleaned up before lookup:
+
+| Obfuscated form              | Cleaned to       |
+|-------------------------------|------------------|
+| `example[.]co[.]ke`          | `example.co.ke`  |
+| `example.[co.ke]`            | `example.co.ke`  |
+| `example.co.[ke]`            | `example.co.ke`  |
+| `example(dot)com`            | `example.com`    |
+| `user[at]example[.]com`      | `user@example.com` |
+
 ```
 example.com
 alice@example.org
 Bob Smith <bob@example.net>
+example[.]co[.]ke
+user[at]example(dot)com
 # this line is a comment and is skipped
 ```
 
@@ -168,7 +182,7 @@ domain it:
 |-----------------------------------------------------------------|----------------------------------------------------------------------|
 | `cannot be loaded because running scripts is disabled`         | Re-run the `Set-ExecutionPolicy` command above in the same window   |
 | `Cannot find path ... domains.txt`                              | Confirm you're in the right folder (`dir`, then `cd`)                |
-| Everything shows `NO_A` even for domains you know are live      | Outbound DNS may be blocked -> try `-Server 8.8.8.8`                  |
+| Everything shows `NO_A` even for domains you know are live      | Outbound DNS may be blocked — try `-Server 8.8.8.8`                  |
 | All `registrar`/`abuse_email` columns are `n/a`                | Outbound HTTPS (443) may be blocked, or check the `whois_note` column for the specific reason |
 
 ## Disclaimer
