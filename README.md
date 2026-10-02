@@ -43,28 +43,30 @@ Bob Smith <bob@example.net>
 
 ## Usage
 
-1. Put `dns_lookup.ps1` and your `domains.txt` in the same folder.
+1. Put `dns_lookup.ps1` (and `domains.txt`, if using a file) in the same folder.
 2. Open PowerShell in that folder (Shift+Right-click the folder →
    *Open PowerShell window here*, or `cd` to it manually).
 3. Allow script execution for this session only (does not change any
    system-wide policy, and reverts when the window is closed):
-```powershell
+   ```powershell
    Set-ExecutionPolicy -Scope Process Bypass
-```
+   ```
    If the script file shows as "blocked" (common for downloaded files):
-```powershell
+   ```powershell
    Unblock-File .\dns_lookup.ps1
-```
-4. Run it:
-```powershell
+   ```
+4. Run it, either from a file, typed directly, or both:
+   ```powershell
    .\dns_lookup.ps1 -InputFile domains.txt
-```
+   .\dns_lookup.ps1 -Domain example.com
+   ```
 
 ### Parameters
 
 | Parameter     | Required | Description                                                        |
 |---------------|----------|----------------------------------------------------------------------|
-| `-InputFile`  | Yes      | Path to your domain/email list.                                     |
+| `-InputFile`  | One of `-InputFile` / `-Domain` is required | Path to your domain/email list. |
+| `-Domain`     | One of `-InputFile` / `-Domain` is required | One or more domains/emails typed directly, comma-separated for multiple. Can be combined with `-InputFile`. |
 | `-OutputFile` | No       | Output CSV path. Defaults to `dns_results.csv`.                     |
 | `-Server`     | No       | Use a specific DNS resolver (e.g. `8.8.8.8`) instead of the host's default. |
 | `-NoWhois`    | No       | Skip the RDAP/WHOIS lookup and only return DNS data (faster).       |
@@ -73,8 +75,17 @@ Bob Smith <bob@example.net>
 ### Examples
 
 ```powershell
-# Basic run
+# From a file
 .\dns_lookup.ps1 -InputFile domains.txt
+
+# One domain typed directly - no file needed
+.\dns_lookup.ps1 -Domain example.com
+
+# Several domains/emails typed directly
+.\dns_lookup.ps1 -Domain example.com,alice@other.org
+
+# Combine a file with extra ad-hoc domains
+.\dns_lookup.ps1 -InputFile domains.txt -Domain justcameup.com
 
 # Custom output file, use Google's resolver
 .\dns_lookup.ps1 -InputFile domains.txt -OutputFile results.csv -Server 8.8.8.8
@@ -107,6 +118,16 @@ Columns:
 | `abuse_phone` | Registrar/registry abuse contact phone                               |
 | `domain_status` | ICANN/EPP domain status code(s) (e.g. `clientTransferProhibited`, `ok`, `pendingDelete`), `;`-separated |
 | `whois_note`  | Explains an `n/a` result (see below) — blank when data was found     |
+
+## Viewing the output
+
+```powershell
+# Open the CSV in Excel (or your default spreadsheet app)
+Invoke-Item .\dns_results.csv
+
+# Open the aligned plain-text table in Notepad
+notepad .\dns_results.txt
+```
 
 ## How WHOIS/RDAP works here
 
@@ -147,7 +168,7 @@ domain it:
 |-----------------------------------------------------------------|----------------------------------------------------------------------|
 | `cannot be loaded because running scripts is disabled`         | Re-run the `Set-ExecutionPolicy` command above in the same window   |
 | `Cannot find path ... domains.txt`                              | Confirm you're in the right folder (`dir`, then `cd`)                |
-| Everything shows `NO_A` even for domains you know are live      | Outbound DNS may be blocked — try `-Server 8.8.8.8`                  |
+| Everything shows `NO_A` even for domains you know are live      | Outbound DNS may be blocked -> try `-Server 8.8.8.8`                  |
 | All `registrar`/`abuse_email` columns are `n/a`                | Outbound HTTPS (443) may be blocked, or check the `whois_note` column for the specific reason |
 
 ## Disclaimer
